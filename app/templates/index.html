@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="tr" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stok ve Makine Bakım Takip Sistemi</title>
+    
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        brand: {
+                            50: '#f0fdf4',
+                            500: '#22c55e',
+                            600: '#16a34a',
+                            700: '#15803d',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body class="h-full flex flex-col font-sans antialiased text-slate-800">
+
+    <!-- TOP HEADER -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-xs">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex items-center justify-between h-16">
+                <!-- Brand Title -->
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-slate-900 text-white rounded-xl shadow-md">
+                        <i data-lucide="settings-2" class="w-6 h-6 text-emerald-400"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-lg font-bold text-slate-900 tracking-tight flex items-center space-x-2">
+                            <span>Stok & Makine Bakım</span>
+                            <span class="text-xs bg-emerald-100 text-emerald-800 font-semibold px-2 py-0.5 rounded-full">v1.0</span>
+                        </h1>
+                        <p class="text-xs text-slate-500 hidden sm:block">Yerel Ağ Endüstriyel Takip Portalı</p>
+                    </div>
+                </div>
+
+                <!-- Right Actions & LAN IP Indicator -->
+                <div class="flex items-center space-x-3">
+                    <!-- LAN Badge -->
+                    <div id="lan-ip-badge" class="hidden sm:flex items-center space-x-1.5 px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-xs text-slate-600 font-mono" title="Aynı Wi-Fi/LAN ağındaki diğer cihazlardan bu adresi açabilirsiniz">
+                        <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                        <span>Yerel Ağ:</span>
+                        <a id="lan-ip-link" href="#" target="_blank" class="font-bold text-slate-900 hover:underline">127.0.0.1:8000</a>
+                    </div>
+
+                    <!-- Quick Maintenance CTA -->
+                    <button onclick="Maintenance.openNewLogModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition flex items-center space-x-2">
+                        <i data-lucide="plus-circle" class="w-4 h-4"></i>
+                        <span>Yeni Bakım Kaydı</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- NAVIGATION TABS -->
+            <div class="flex space-x-1 border-t border-slate-100 py-2 overflow-x-auto">
+                <button data-tab-target="dashboard" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-semibold bg-slate-900 text-white shadow-sm transition">
+                    <i data-lucide="layout-dashboard" class="w-4 h-4"></i>
+                    <span>Genel Bakış</span>
+                </button>
+                <button data-tab-target="machines" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">
+                    <i data-lucide="cpu" class="w-4 h-4"></i>
+                    <span>Makineler & Ekipmanlar</span>
+                </button>
+                <button data-tab-target="inventory" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">
+                    <i data-lucide="boxes" class="w-4 h-4"></i>
+                    <span>Yedek Parça & Stok</span>
+                </button>
+                <button data-tab-target="maintenance" class="flex items-center space-x-2 px-3.5 py-2 rounded-lg text-sm font-medium text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition">
+                    <i data-lucide="clipboard-check" class="w-4 h-4"></i>
+                    <span>Bakım Geçmişi & Raporlar</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- MAIN CONTAINER -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+        <!-- ======================================================== -->
+        <!-- TAB 1: DASHBOARD -->
+        <!-- ======================================================== -->
+        <section id="tab-dashboard" class="tab-panel space-y-6">
+            <!-- 4 KPI CARDS -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <!-- Card 1: Machines -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Toplam Makine</p>
+                        <h3 id="kpi-total-machines" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+                        <p id="kpi-active-machines" class="text-xs text-slate-500 mt-0.5 font-medium">0 Aktif</p>
+                    </div>
+                    <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                        <i data-lucide="cpu" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <!-- Card 2: Upcoming Maintenances -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Bakım Zamanı Gelenler</p>
+                        <h3 id="kpi-due-maintenances" class="text-2xl font-bold text-amber-600 mt-1">0</h3>
+                        <p id="kpi-due-sub" class="text-xs text-slate-500 mt-0.5">Acil & Yaklaşan</p>
+                    </div>
+                    <div class="p-3 bg-amber-50 text-amber-600 rounded-xl">
+                        <i data-lucide="clock" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <!-- Card 3: Total Spare Parts -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between">
+                    <div>
+                        <p class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kayıtlı Yedek Parça</p>
+                        <h3 id="kpi-total-parts" class="text-2xl font-bold text-slate-900 mt-1">0</h3>
+                        <p class="text-xs text-slate-500 mt-0.5">Farklı Kalem</p>
+                    </div>
+                    <div class="p-3 bg-indigo-50 text-indigo-600 rounded-xl">
+                        <i data-lucide="boxes" class="w-6 h-6"></i>
+                    </div>
+                </div>
+
+                <!-- Card 4: Critical Stock Alert -->
+                <div class="bg-white p-5 rounded-2xl border border-rose-200 shadow-xs flex items-center justify-between bg-rose-50/30">
+                    <div>
+                        <p class="text-xs font-semibold text-rose-600 uppercase tracking-wider flex items-center space-x-1">
+                            <span>Kritik Stok Uyarısı</span>
+                        </p>
+                        <h3 id="kpi-critical-parts" class="text-2xl font-bold text-rose-600 mt-1">0</h3>
+                        <p id="kpi-critical-sub" class="text-xs text-rose-600 font-semibold mt-0.5">Kritik seviyede parça var!</p>
+                    </div>
+                    <div class="p-3 bg-rose-100 text-rose-600 rounded-xl badge-pulse-danger">
+                        <i data-lucide="alert-triangle" class="w-6 h-6"></i>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TWO ALERT PANELS (Critical Stock & Upcoming Maintenance) -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- 1. Critical Stock Alert Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+                    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-rose-50/40">
+                        <div class="flex items-center space-x-2">
+                            <span class="p-1.5 bg-rose-100 text-rose-600 rounded-lg">
+                                <i data-lucide="alert-circle" class="w-4 h-4"></i>
+                            </span>
+                            <h2 class="font-bold text-slate-800 text-sm">Kritik Stok Seviyesindeki Parçalar</h2>
+                        </div>
+                        <span id="dashboard-critical-count" class="text-xs font-bold bg-rose-100 text-rose-800 px-2.5 py-0.5 rounded-full">0 Parça</span>
+                    </div>
+                    <div id="dashboard-critical-list" class="p-4 space-y-3 flex-1 overflow-y-auto max-h-80">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+
+                <!-- 2. Upcoming Maintenance Card -->
+                <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden flex flex-col">
+                    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-amber-50/40">
+                        <div class="flex items-center space-x-2">
+                            <span class="p-1.5 bg-amber-100 text-amber-600 rounded-lg">
+                                <i data-lucide="calendar" class="w-4 h-4"></i>
+                            </span>
+                            <h2 class="font-bold text-slate-800 text-sm">Yaklaşan ve Geciken Bakımlar</h2>
+                        </div>
+                        <span id="dashboard-upcoming-count" class="text-xs font-bold bg-amber-100 text-amber-800 px-2.5 py-0.5 rounded-full">0 Makine</span>
+                    </div>
+                    <div id="dashboard-upcoming-list" class="p-4 space-y-3 flex-1 overflow-y-auto max-h-80">
+                        <!-- Populated by JS -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- CHARTS SECTION -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <!-- Monthly Trend Chart -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-slate-800 text-sm flex items-center space-x-2">
+                            <i data-lucide="trending-up" class="w-4 h-4 text-blue-600"></i>
+                            <span>Son 6 Aylık Bakım Trendi</span>
+                        </h3>
+                    </div>
+                    <div class="h-56 relative">
+                        <canvas id="chart-monthly-maintenance"></canvas>
+                    </div>
+                </div>
+
+                <!-- Top Parts Chart -->
+                <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-bold text-slate-800 text-sm flex items-center space-x-2">
+                            <i data-lucide="bar-chart-3" class="w-4 h-4 text-indigo-600"></i>
+                            <span>En Sık Kullanılan Yedek Parçalar</span>
+                        </h3>
+                    </div>
+                    <div class="h-56 relative">
+                        <canvas id="chart-top-parts"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RECENT MAINTENANCE TABLE -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 class="font-bold text-slate-800 text-sm flex items-center space-x-2">
+                        <i data-lucide="history" class="w-4 h-4 text-slate-500"></i>
+                        <span>Son Gerçekleşen Bakımlar</span>
+                    </h3>
+                    <button onclick="App.switchTab('maintenance')" class="text-xs text-blue-600 hover:text-blue-800 font-semibold flex items-center space-x-1">
+                        <span>Tümünü Gör</span>
+                        <i data-lucide="chevron-right" class="w-3.5 h-3.5"></i>
+                    </button>
+                </div>
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">Tarih</th>
+                                <th class="py-3 px-4">Makine</th>
+                                <th class="py-3 px-4">Bakım Türü</th>
+                                <th class="py-3 px-4">Kullanılan Parça</th>
+                                <th class="py-3 px-4">Teknisyen</th>
+                            </tr>
+                        </thead>
+                        <tbody id="dashboard-recent-logs" class="divide-y divide-slate-100">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 2: MACHINES -->
+        <!-- ======================================================== -->
+        <section id="tab-machines" class="tab-panel hidden space-y-4">
+            <!-- Filter & Action Bar -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex flex-1 items-center space-x-3">
+                    <div class="relative flex-1 max-w-sm">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                        <input id="machine-search" type="text" placeholder="Makine adı, kodu, modeli veya lokasyon ara..."
+                               class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition">
+                    </div>
+                    <select id="machine-status-filter" onchange="Machines.load()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900">
+                        <option value="">Tüm Durumlar</option>
+                        <option value="Aktif">Aktif</option>
+                        <option value="Bakımda">Bakımda</option>
+                        <option value="Arızalı">Arızalı</option>
+                    </select>
+                </div>
+                <button onclick="Machines.openAddModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition flex items-center space-x-2 shrink-0">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Yeni Makine Ekle</span>
+                </button>
+            </div>
+
+            <!-- Machines Table -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">Makine Kodu</th>
+                                <th class="py-3 px-4">Makine Tanımı & Model</th>
+                                <th class="py-3 px-4">Lokasyon / Bölüm</th>
+                                <th class="py-3 px-4">Son Bakım</th>
+                                <th class="py-3 px-4 text-center">Periyot</th>
+                                <th class="py-3 px-4">Sıradaki Bakım & Durum</th>
+                                <th class="py-3 px-4 text-right">İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="machines-table-body" class="divide-y divide-slate-100">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 3: INVENTORY (SPARE PARTS) -->
+        <!-- ======================================================== -->
+        <section id="tab-inventory" class="tab-panel hidden space-y-4">
+            <!-- Filter & Action Bar -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3 flex-1">
+                    <div class="relative flex-1 min-w-[200px] max-w-sm">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                        <input id="inventory-search" type="text" placeholder="Parça adı, kodu veya raf ara..."
+                               class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition">
+                    </div>
+                    <select id="inventory-category-filter" onchange="Inventory.load()" class="text-sm bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-slate-900">
+                        <option value="">Tüm Kategoriler</option>
+                        <option value="Elektrik">Elektrik</option>
+                        <option value="Mekanik">Mekanik</option>
+                        <option value="Pnömatik">Pnömatik</option>
+                        <option value="Hidrolik">Hidrolik</option>
+                        <option value="Sensör">Sensör</option>
+                        <option value="Genel">Genel</option>
+                    </select>
+                    <!-- Critical Only Toggle -->
+                    <label class="flex items-center space-x-2 text-sm font-medium text-slate-700 cursor-pointer bg-slate-50 px-3 py-2 rounded-xl border border-slate-200 hover:bg-slate-100 transition">
+                        <input id="inventory-critical-toggle" type="checkbox" onchange="Inventory.load()" class="w-4 h-4 text-rose-600 rounded border-slate-300 focus:ring-rose-500">
+                        <span class="text-rose-700 font-semibold flex items-center space-x-1">
+                            <i data-lucide="alert-triangle" class="w-3.5 h-3.5 text-rose-500"></i>
+                            <span>Sadece Kritik Stok</span>
+                        </span>
+                    </label>
+                </div>
+                <button onclick="Inventory.openAddModal()" class="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white text-sm font-semibold rounded-xl shadow-sm transition flex items-center space-x-2 shrink-0">
+                    <i data-lucide="plus" class="w-4 h-4"></i>
+                    <span>Yeni Parça Ekle</span>
+                </button>
+            </div>
+
+            <!-- Inventory Table -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">Parça Kodu</th>
+                                <th class="py-3 px-4">Parça Adı & Notlar</th>
+                                <th class="py-3 px-4">Kategori</th>
+                                <th class="py-3 px-4">Raf / Konum</th>
+                                <th class="py-3 px-4">Mevcut Stok</th>
+                                <th class="py-3 px-4">Kritik Eşik</th>
+                                <th class="py-3 px-4 text-right">İşlemler</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventory-table-body" class="divide-y divide-slate-100">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+
+        <!-- ======================================================== -->
+        <!-- TAB 4: MAINTENANCE LOGS -->
+        <!-- ======================================================== -->
+        <section id="tab-maintenance" class="tab-panel hidden space-y-4">
+            <!-- Filter & Action Bar -->
+            <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div class="flex flex-wrap items-center gap-3 flex-1">
+                    <div class="relative flex-1 min-w-[200px] max-w-sm">
+                        <i data-lucide="search" class="w-4 h-4 absolute left-3 top-3 text-slate-400"></i>
+                        <input id="log-search" type="text" placeholder="İşlem detayı, teknisyen veya makine ara..."
+                               class="w-full pl-9 pr-3 py-2 text-sm bg-slate-50 border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-slate-900 focus:bg-white transition">
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <button onclick="Maintenance.exportCSV()" class="px-3.5 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm font-semibold rounded-xl transition flex items-center space-x-1.5 shadow-xs">
+                        <i data-lucide="download" class="w-4 h-4"></i>
+                        <span>Excel / CSV İndir</span>
+                    </button>
+                    <button onclick="Maintenance.openNewLogModal()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold rounded-xl shadow-sm transition flex items-center space-x-2">
+                        <i data-lucide="plus" class="w-4 h-4"></i>
+                        <span>Yeni Bakım Kaydı</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Maintenance Logs Table -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                                <th class="py-3 px-4">Tarih</th>
+                                <th class="py-3 px-4">Makine</th>
+                                <th class="py-3 px-4">Tür</th>
+                                <th class="py-3 px-4">Kullanılan Parça & Adet</th>
+                                <th class="py-3 px-4">Teknisyen</th>
+                                <th class="py-3 px-4">Yapılan İşlem Detayı</th>
+                                <th class="py-3 px-4">Maliyet</th>
+                                <th class="py-3 px-4 text-right">Sil</th>
+                            </tr>
+                        </thead>
+                        <tbody id="logs-table-body" class="divide-y divide-slate-100">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+
+    <!-- ======================================================== -->
+    <!-- MODALS -->
+    <!-- ======================================================== -->
+
+    <!-- 1. MACHINE MODAL (ADD / EDIT) -->
+    <div id="machine-modal" class="fixed inset-0 z-50 modal-backdrop hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div class="p-4 bg-slate-900 text-white flex items-center justify-between">
+                <h3 id="machine-modal-title" class="font-bold text-base">Yeni Makine Ekle</h3>
+                <button onclick="App.closeModal('machine-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="machine-form" onsubmit="Machines.saveMachine(event)" class="p-6 space-y-4">
+                <input type="hidden" id="machine-id">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Makine Kodu *</label>
+                        <input id="machine-code" type="text" required placeholder="örn: M-101" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 uppercase font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Durum</label>
+                        <select id="machine-status" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900">
+                            <option value="Aktif">Aktif</option>
+                            <option value="Bakımda">Bakımda</option>
+                            <option value="Arızalı">Arızalı</option>
+                            <option value="Hizmet Dışı">Hizmet Dışı</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Makine Adı *</label>
+                    <input id="machine-name" type="text" required placeholder="örn: CNC Dik İşleme Merkezi 1" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900">
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Model / Tip</label>
+                        <input id="machine-model" type="text" placeholder="örn: Mazak VTC-800" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Seri No</label>
+                        <input id="machine-serial" type="text" placeholder="örn: SN-84729" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl font-mono text-xs">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Bölüm / Lokasyon</label>
+                        <input id="machine-location" type="text" placeholder="örn: Talaşlı İmalat Hat 1" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Bakım Aralığı (Gün) *</label>
+                        <input id="machine-interval" type="number" min="1" required value="30" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl font-semibold">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Son Bakım Tarihi (Opsiyonel)</label>
+                    <input id="machine-last-date" type="date" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Teknik Notlar</label>
+                    <textarea id="machine-notes" rows="2" placeholder="Örn: Yağlama noktaları, özel bakım uyarıları..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="App.closeModal('machine-modal')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-xl font-medium">İptal</button>
+                    <button type="submit" class="px-5 py-2 text-sm bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold shadow-sm">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- 2. INVENTORY MODAL (ADD / EDIT) -->
+    <div id="part-modal" class="fixed inset-0 z-50 modal-backdrop hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div class="p-4 bg-slate-900 text-white flex items-center justify-between">
+                <h3 id="part-modal-title" class="font-bold text-base">Yeni Yedek Parça Ekle</h3>
+                <button onclick="App.closeModal('part-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="part-form" onsubmit="Inventory.savePart(event)" class="p-6 space-y-4">
+                <input type="hidden" id="part-id">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Parça Kodu *</label>
+                        <input id="part-code" type="text" required placeholder="örn: YP-101" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 uppercase font-mono">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Kategori</label>
+                        <select id="part-category" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                            <option value="Elektrik">Elektrik</option>
+                            <option value="Mekanik">Mekanik</option>
+                            <option value="Pnömatik">Pnömatik</option>
+                            <option value="Hidrolik">Hidrolik</option>
+                            <option value="Sensör">Sensör</option>
+                            <option value="Genel">Genel</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Parça Adı ve Tanımı *</label>
+                    <input id="part-name" type="text" required placeholder="örn: Siemens Kontaktör 24V DC" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                </div>
+
+                <div class="grid grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Mevcut Stok *</label>
+                        <input id="part-stock" type="number" min="0" required value="0" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl font-bold">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-rose-700 mb-1">Kritik Eşik *</label>
+                        <input id="part-critical" type="number" min="0" required value="5" class="w-full px-3 py-2 text-sm border border-rose-300 bg-rose-50/50 rounded-xl font-bold text-rose-900">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Birim</label>
+                        <input id="part-unit" type="text" required value="Adet" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                    </div>
+                </div>
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Raf / Kutu Konumu</label>
+                        <input id="part-shelf" type="text" placeholder="örn: Raf A-1 / K-03" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Birim Fiyat (TL)</label>
+                        <input id="part-price" type="number" step="0.01" min="0" value="0.00" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl font-mono">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Açıklama / Muadil Bilgisi</label>
+                    <textarea id="part-notes" rows="2" placeholder="Tedarikçi bilgisi veya parça detayları..." class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl"></textarea>
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="App.closeModal('part-modal')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-xl font-medium">İptal</button>
+                    <button type="submit" class="px-5 py-2 text-sm bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-semibold shadow-sm">Kaydet</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- 3. STOCK ADJUSTMENT MODAL -->
+    <div id="adjust-stock-modal" class="fixed inset-0 z-50 modal-backdrop hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div class="p-4 bg-slate-900 text-white flex items-center justify-between">
+                <h3 class="font-bold text-base flex items-center space-x-2">
+                    <i data-lucide="plus-minus" class="w-4 h-4 text-emerald-400"></i>
+                    <span>Hızlı Stok Ayarla</span>
+                </h3>
+                <button onclick="App.closeModal('adjust-stock-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form onsubmit="Inventory.saveStockAdjustment(event)" class="p-6 space-y-4">
+                <input type="hidden" id="adjust-part-id">
+                
+                <div class="p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                    <p class="text-xs text-slate-500 font-medium">Seçili Parça</p>
+                    <h4 id="adjust-part-name" class="font-bold text-slate-800 text-sm mt-0.5">-</h4>
+                    <p class="text-xs text-slate-600 mt-1">Mevcut Stok: <strong id="adjust-current-stock" class="text-slate-900 font-bold">0 Adet</strong></p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">İşlem Türü</label>
+                        <select id="adjust-type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl font-semibold">
+                            <option value="add">➕ Stok Ekle (Giriş)</option>
+                            <option value="sub">➖ Stok Düş (Manuel Çıkış)</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Miktar *</label>
+                        <input id="adjust-amount" type="number" min="1" required value="1" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl font-bold">
+                    </div>
+                </div>
+
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">İşlem Sebebi / Not</label>
+                    <input id="adjust-reason" type="text" value="Depo Girişi / Tedarik" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                </div>
+
+                <div class="flex justify-end space-x-2 pt-2 border-t border-slate-100">
+                    <button type="button" onclick="App.closeModal('adjust-stock-modal')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-xl font-medium">İptal</button>
+                    <button type="submit" class="px-5 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-sm">Stoğu Güncelle</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- 4. MAINTENANCE MODAL (MAIN ACTION - AUTO STOCK DEDUCTION) -->
+    <div id="maintenance-modal" class="fixed inset-0 z-50 modal-backdrop hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-xl w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150">
+            <div class="p-4 bg-slate-900 text-white flex items-center justify-between">
+                <div class="flex items-center space-x-2">
+                    <div class="p-1.5 bg-emerald-600 rounded-lg text-white">
+                        <i data-lucide="wrench" class="w-5 h-5"></i>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-base">Yeni Bakım Kaydı Oluştur</h3>
+                        <p class="text-xs text-emerald-300 font-medium">Kullanılan parçalar stoktan otomatik düşülür</p>
+                    </div>
+                </div>
+                <button onclick="App.closeModal('maintenance-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <form id="maintenance-form" onsubmit="Maintenance.saveLog(event)" class="p-6 space-y-4">
+                
+                <!-- Machine Select -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Bakım Yapılan Makine *</label>
+                    <select id="m-machine-select" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900 font-semibold text-slate-800">
+                        <option value="">-- Makine Seçiniz --</option>
+                    </select>
+                </div>
+
+                <!-- Type & Date -->
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Bakım Türü *</label>
+                        <select id="m-type" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                            <option value="Periyodik Bakım">Periyodik Bakım</option>
+                            <option value="Arıza Onarım">Arıza Onarım</option>
+                            <option value="Önleyici Bakım">Önleyici Bakım</option>
+                            <option value="Revizyon / İyileştirme">Revizyon / İyileştirme</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Bakım Tarihi *</label>
+                        <input id="m-date" type="date" required class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl font-medium">
+                    </div>
+                </div>
+
+                <!-- Spare Part & Qty (With automatic stock check) -->
+                <div class="p-4 bg-slate-50 border border-slate-200 rounded-xl space-y-3">
+                    <label class="block text-xs font-bold text-slate-800 flex items-center space-x-1.5">
+                        <i data-lucide="package" class="w-4 h-4 text-slate-600"></i>
+                        <span>Kullanılan Yedek Parça (Stoktan Otomatik Düşer)</span>
+                    </label>
+
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="col-span-2">
+                            <select id="m-part-select" onchange="Maintenance.onPartChange()" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white">
+                                <option value="">-- Parça Kullanılmadı --</option>
+                            </select>
+                        </div>
+                        <div id="m-qty-container" class="opacity-50">
+                            <input id="m-part-qty" type="number" min="0" value="0" disabled placeholder="Adet"
+                                   class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl font-bold bg-white">
+                        </div>
+                    </div>
+                    
+                    <!-- Dynamic Live Part Stock Info -->
+                    <div id="m-part-stock-info" class="hidden"></div>
+                </div>
+
+                <!-- Technician & Hours/Cost -->
+                <div class="grid grid-cols-3 gap-3">
+                    <div class="col-span-1">
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Teknisyen / Usta *</label>
+                        <input id="m-technician" type="text" required placeholder="örn: Ahmet Usta" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Süre (Saat)</label>
+                        <input id="m-labor-hours" type="number" step="0.5" min="0" value="1.0" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-semibold text-slate-700 mb-1">Maliyet (TL)</label>
+                        <input id="m-cost" type="number" step="0.01" min="0" value="0.00" placeholder="Oto hesap" class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl font-mono">
+                    </div>
+                </div>
+
+                <!-- Description -->
+                <div>
+                    <label class="block text-xs font-semibold text-slate-700 mb-1">Yapılan İşlem Detayı & Notlar *</label>
+                    <textarea id="m-description" rows="3" required placeholder="Yapılan kontroller, değiştirilen filtreler, ölçülen değerler ve operasyon detayları..."
+                              class="w-full px-3 py-2 text-sm border border-slate-200 rounded-xl focus:ring-2 focus:ring-slate-900"></textarea>
+                </div>
+
+                <div class="flex items-center justify-between pt-3 border-t border-slate-100">
+                    <span class="text-xs text-slate-400">⚡ Sıradaki bakım tarihi periyoda göre ötelenir.</span>
+                    <div class="flex space-x-2">
+                        <button type="button" onclick="App.closeModal('maintenance-modal')" class="px-4 py-2 text-sm text-slate-600 hover:bg-slate-100 rounded-xl font-medium">İptal</button>
+                        <button type="submit" class="px-5 py-2 text-sm bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-semibold shadow-sm flex items-center space-x-1.5">
+                            <i data-lucide="check" class="w-4 h-4"></i>
+                            <span>Bakımı Kaydet & Stoğu Düş</span>
+                        </button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+
+    <!-- 5. MACHINE HISTORY MODAL -->
+    <div id="machine-history-modal" class="fixed inset-0 z-50 modal-backdrop hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden border border-slate-200 animate-in fade-in zoom-in duration-150 flex flex-col max-h-[85vh]">
+            <div class="p-4 bg-slate-900 text-white flex items-center justify-between">
+                <div>
+                    <h3 class="font-bold text-base flex items-center space-x-2">
+                        <i data-lucide="history" class="w-5 h-5 text-blue-400"></i>
+                        <span>Makine Bakım Geçmişi</span>
+                    </h3>
+                    <p id="history-machine-name" class="text-xs text-slate-300 mt-0.5">-</p>
+                </div>
+                <button onclick="App.closeModal('machine-history-modal')" class="text-slate-400 hover:text-white p-1 rounded-lg">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            <div class="p-4 flex-1 overflow-y-auto">
+                <table class="w-full text-left border-collapse">
+                    <thead>
+                        <tr class="bg-slate-50 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            <th class="py-2.5 px-3">Tarih</th>
+                            <th class="py-2.5 px-3">Bakım Türü</th>
+                            <th class="py-2.5 px-3">İşlem Detayı</th>
+                            <th class="py-2.5 px-3">Kullanılan Parça</th>
+                            <th class="py-2.5 px-3">Teknisyen</th>
+                        </tr>
+                    </thead>
+                    <tbody id="machine-history-list" class="divide-y divide-slate-100">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
+            </div>
+            <div class="p-3 bg-slate-50 border-t border-slate-200 flex justify-end">
+                <button onclick="App.closeModal('machine-history-modal')" class="px-4 py-1.5 text-sm bg-slate-800 text-white hover:bg-slate-700 rounded-xl font-medium">Kapat</button>
+            </div>
+        </div>
+    </div>
+
+
+    <!-- TOAST NOTIFICATION CONTAINER -->
+    <div id="toast-container" class="fixed bottom-5 right-5 z-50 flex flex-col space-y-2 max-w-sm pointer-events-none"></div>
+
+    <!-- SCRIPTS -->
+    <script src="/static/js/api.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/machines.js"></script>
+    <script src="/static/js/inventory.js"></script>
+    <script src="/static/js/maintenance.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
