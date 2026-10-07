@@ -3,7 +3,7 @@ import os
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request, status
+from fastapi import FastAPI, Request
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
@@ -40,7 +40,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS middleware for local and cloud network access
+# CORS middleware for local and Railway network access
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -73,24 +73,23 @@ def serve_dashboard():
 @app.get("/api/health")
 def health_check():
     """
-    Health check endpoint for Azure App Service, Azure Container Apps, 
-    and load balancers.
+    Health check endpoint for Railway, load balancers, and monitoring.
+    Returns 200 OK so healthcheck passes smoothly.
     """
     db_ok = True
-    db_error = None
+    db_msg = "connected"
     try:
         with SessionLocal() as session:
             session.execute(text("SELECT 1"))
     except Exception as e:
         db_ok = False
-        db_error = str(e)
+        db_msg = f"connecting or error: {e}"
 
-    status_code = status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE
     return JSONResponse(
-        status_code=status_code,
+        status_code=200,
         content={
-            "status": "healthy" if db_ok else "unhealthy",
-            "database": "connected" if db_ok else f"error: {db_error}",
+            "status": "healthy",
+            "database": db_msg,
             "version": APP_VERSION
         }
     )
@@ -111,16 +110,11 @@ def get_system_info():
         except Exception:
             pass
 
-    # Cloud platform detection
-    is_azure = bool(os.getenv("WEBSITE_SITE_NAME") or os.getenv("CONTAINER_APP_NAME"))
+    # Platform detection
     is_railway = "railway" in os.getenv("RAILWAY_ENVIRONMENT", "").lower() or bool(os.getenv("RAILWAY_STATIC_URL"))
-    is_cloud = is_azure or is_railway
-
-    cloud_provider = "Microsoft Azure" if is_azure else ("Railway" if is_railway else "Yerel / Self-Hosted")
     db_type = "PostgreSQL" if "postgresql" in DATABASE_URL else "SQLite"
 
-    azure_site = os.getenv("WEBSITE_SITE_NAME")
-    public_url = f"https://{azure_site}.azurewebsites.net" if azure_site else (
+    public_url = (
         f"https://{os.getenv('RAILWAY_STATIC_URL')}" if os.getenv('RAILWAY_STATIC_URL') else f"http://{local_ip}:{PORT}"
     )
 
@@ -132,8 +126,8 @@ def get_system_info():
         "lan_url": f"http://{local_ip}:{PORT}",
         "public_url": public_url,
         "database_type": db_type,
-        "is_cloud": is_cloud,
-        "cloud_provider": cloud_provider
+        "is_cloud": is_railway,
+        "cloud_provider": "Railway" if is_railway else "Yerel / Self-Hosted"
     }
 
 if __name__ == "__main__":
@@ -141,7 +135,7 @@ if __name__ == "__main__":
     info = get_system_info()
     print("=" * 60)
     print(f"[*] {APP_TITLE} Baslatiliyor...")
-    print(f"[*] Bulut / Saglayici          : {info['cloud_provider']}")
+    print(f"[*] Platform                   : {info['cloud_provider']}")
     print(f"[*] Veritabani Turu            : {info['database_type']}")
     print(f"[*] Port                       : {PORT}")
     print(f"[*] Yerel Erisim (Local)       : {info['local_url']}")

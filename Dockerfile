@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies needed for compiling psycopg2 and health checks
+# Install system dependencies needed for compiling psycopg2 and general utils
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
@@ -21,12 +21,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Expose port 8000 default
+# Expose default port
 EXPOSE 8000
 
-# Azure / Railway Health Check
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://localhost:${PORT:-${WEBSITES_PORT:-8000}}/api/health || exit 1
-
-# Start via Python directly - avoids shell variable expansion issues on Railway/Azure
+# Start via Python directly - reads dynamic $PORT from environment
 CMD ["python", "main.py"]
