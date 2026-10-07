@@ -10,13 +10,18 @@ if DATABASE_URL.startswith("sqlite"):
         echo=False
     )
 else:
-    # PostgreSQL configuration for Cloud / Railway
+    # PostgreSQL configuration for Cloud (Azure / Railway / AWS)
+    connect_args = {}
+    if "postgres.database.azure.com" in DATABASE_URL:
+        connect_args["sslmode"] = "require"
+
     engine = create_engine(
         DATABASE_URL,
         pool_pre_ping=True,
         pool_recycle=300,
         pool_size=10,
         max_overflow=20,
+        connect_args=connect_args,
         echo=False
     )
 

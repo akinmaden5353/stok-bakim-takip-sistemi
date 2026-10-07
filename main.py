@@ -3,20 +3,25 @@ import os
 import sys
 from pathlib import Path
 from contextlib import asynccontextmanager
-from fastapi import FastAPI, Request
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi import FastAPI, Request, status
+from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
+from sqlalchemy import text
 
 from app.config import APP_TITLE, APP_DESCRIPTION, APP_VERSION, HOST, PORT, BASE_DIR, AUTO_SEED, DATABASE_URL
-from app.database import engine, Base
+from app.database import engine, Base, SessionLocal
 from app.routers import machines_api, inventory_api, maintenance_api, dashboard_api
 import seed_data
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # 1. Startup: Create tables in PostgreSQL / SQLite
-    Base.metadata.create_all(bind=engine)
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("[*] Veritabani tablolari basariyla dogrulandi/olusturuldu.")
+    except Exception as e:
+        print(f"[!] Veritabani tablolari olusturulurken hata: {e}")
     
     # 2. Auto-seed if enabled and DB is empty
     if AUTO_SEED:
@@ -65,6 +70,31 @@ def serve_dashboard():
             return HTMLResponse(content=f.read())
     return HTMLResponse("<h2>Uygulama yukleniyor...</h2>", status_code=200)
 
+@app.get("/api/health")
+def health_check():
+    """
+    Health check endpoint for Azure App Service, Azure Container Apps, 
+    and load balancers.
+    """
+    db_ok = True
+    db_error = None
+    try:
+        with SessionLocal() as session:
+            session.execute(text("SELECT 1"))
+    except Exception as e:
+        db_ok = False
+        db_error = str(e)
+
+    status_code = status.HTTP_200_OK if db_ok else status.HTTP_503_SERVICE_UNAVAILABLE
+    return JSONResponse(
+        status_code=status_code,
+        content={
+            "status": "healthy" if db_ok else "unhealthy",
+            "database": "connected" if db_ok else f"error: {db_error}",
+            "version": APP_VERSION
+        }
+    )
+
 @app.get("/api/system-info")
 def get_system_info():
     """Returns the environment and connection details."""
@@ -81,8 +111,18 @@ def get_system_info():
         except Exception:
             pass
 
-    is_cloud = "railway" in os.getenv("RAILWAY_ENVIRONMENT", "").lower() or bool(os.getenv("RAILWAY_STATIC_URL"))
+    # Cloud platform detection
+    is_azure = bool(os.getenv("WEBSITE_SITE_NAME") or os.getenv("CONTAINER_APP_NAME"))
+    is_railway = "railway" in os.getenv("RAILWAY_ENVIRONMENT", "").lower() or bool(os.getenv("RAILWAY_STATIC_URL"))
+    is_cloud = is_azure or is_railway
+
+    cloud_provider = "Microsoft Azure" if is_azure else ("Railway" if is_railway else "Yerel / Self-Hosted")
     db_type = "PostgreSQL" if "postgresql" in DATABASE_URL else "SQLite"
+
+    azure_site = os.getenv("WEBSITE_SITE_NAME")
+    public_url = f"https://{azure_site}.azurewebsites.net" if azure_site else (
+        f"https://{os.getenv('RAILWAY_STATIC_URL')}" if os.getenv('RAILWAY_STATIC_URL') else f"http://{local_ip}:{PORT}"
+    )
 
     return {
         "hostname": hostname,
@@ -90,8 +130,10 @@ def get_system_info():
         "port": PORT,
         "local_url": f"http://localhost:{PORT}",
         "lan_url": f"http://{local_ip}:{PORT}",
+        "public_url": public_url,
         "database_type": db_type,
-        "is_cloud": is_cloud
+        "is_cloud": is_cloud,
+        "cloud_provider": cloud_provider
     }
 
 if __name__ == "__main__":
@@ -99,10 +141,12 @@ if __name__ == "__main__":
     info = get_system_info()
     print("=" * 60)
     print(f"[*] {APP_TITLE} Baslatiliyor...")
+    print(f"[*] Bulut / Saglayici          : {info['cloud_provider']}")
     print(f"[*] Veritabani Turu            : {info['database_type']}")
     print(f"[*] Port                       : {PORT}")
     print(f"[*] Yerel Erisim (Local)       : {info['local_url']}")
     print(f"[*] Yerel Ag (LAN) Erisimi     : {info['lan_url']}")
+    print(f"[*] Saglik Kontrolu (Health)   : {info['local_url']}/api/health")
     print(f"[*] API Dokumantasyonu (Docs)  : {info['local_url']}/docs")
     print("=" * 60)
     uvicorn.run("main:app", host=HOST, port=PORT, reload=False)

@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app
 
-# Install system dependencies needed for compiling psycopg2 and general utils
+# Install system dependencies needed for compiling psycopg2 and health checks
 RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     libpq-dev \
@@ -21,8 +21,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy project files
 COPY . .
 
-# Expose port (Railway will override with $PORT at runtime)
+# Expose port 8000 default
 EXPOSE 8000
 
-# Start Uvicorn bound to 0.0.0.0 and dynamic $PORT
-CMD uvicorn main:app --host 0.0.0.0 --port $PORT
+# Azure / Railway Health Check
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD curl -f http://localhost:${PORT:-${WEBSITES_PORT:-8000}}/api/health || exit 1
+
+# Start via Python directly - avoids shell variable expansion issues on Railway/Azure
+CMD ["python", "main.py"]
